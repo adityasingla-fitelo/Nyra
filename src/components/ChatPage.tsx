@@ -325,12 +325,30 @@ export default function ChatPage({
         setDynamicActions([]);
       }
 
-      // Split bot reply by \n and save each part as a separate message
-      // This allows natural multi-message responses like "hmm\nsamajh gayi\nlet's go"
-      const messageParts = botReply
-        .split("\n")
-        .map((part: string) => part.trim())
-        .filter((part: string) => part.length > 0); // Remove empty strings
+      // Split bot reply by \n ONLY for casual responses
+      // Structured content (headings, bullet points) should stay as ONE message
+      
+      // Check if this is structured content (diet plans, workout plans, etc.)
+      const isStructuredContent = botReply.includes("##") || 
+                                  botReply.includes("###") ||
+                                  (botReply.includes("- ") && botReply.includes(":")) ||
+                                  botReply.includes("**Day") ||
+                                  botReply.includes("Breakfast") ||
+                                  botReply.includes("Lunch") ||
+                                  botReply.includes("Dinner");
+
+      let messageParts: string[] = [];
+      
+      if (isStructuredContent) {
+        // For structured content: save as ONE message, no splitting
+        messageParts = [botReply];
+      } else {
+        // For casual responses: split by \n for natural multi-message feel
+        messageParts = botReply
+          .split("\n")
+          .map((part: string) => part.trim())
+          .filter((part: string) => part.length > 0); // Remove empty strings
+      }
 
       // If no parts after filtering, save the original reply
       if (messageParts.length === 0) {
