@@ -277,127 +277,36 @@ export default function ChatPage({
       });
       setMessages((prev) => [...prev, userMsg]);
 
-      // Detect structured / markdown-heavy content
-      const isStructuredContent = (text: string) => {
-        return (
-          /breakfast|lunch|dinner/i.test(text) || // meal headings
-          /\n\s*[-•]\s+/.test(text) ||             // bullet lists
-          /\*\*|##|###/.test(text) ||               // markdown
-          /\b(plan|routine|schedule|steps)\b/i.test(text)
-        );
-      };
-
-      // Split reply naturally into intro / structured / outro
-      const splitReplyNaturally = (text: string) => {
-        const lines = text
-          .split("\n")
-          .map((l) => l.trim())
-          .filter(Boolean);
-
-        const intro: string[] = [];
-        const structured: string[] = [];
-        const outro: string[] = [];
-
-        let structuredStarted = false;
-
-        for (const line of lines) {
-          if (isStructuredContent(line) || structuredStarted) {
-            structuredStarted = true;
-            structured.push(line);
-          } else {
-            intro.push(line);
-          }
-        }
-
-        // Pull short conversational ending out of structured block
-        if (structured.length > 0) {
-          while (
-            structured.length &&
-            structured[structured.length - 1].length < 90 &&
-            !isStructuredContent(structured[structured.length - 1])
-          ) {
-            outro.unshift(structured.pop()!);
-          }
-        }
-
-        return {
-          intro: intro.join(" "),
-          structured: structured.join("\n"),
-          outro: outro.join(" "),
-        };
-      };
-
-
-
-    // Call chat API
-    const response = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messages: [
-          ...messages.slice(-20).map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-          { role: "user", content: userMessage },
-        ],
-        persona: persona || undefined,
-        intent: intent || undefined,
-      }),
-    });
-
-    const data = await response.json();
-
-    /* ---------- MAIN BOT REPLY ---------- */
-    const botReply =
-      data.reply || "hmm, kuch issue aa gaya. try again?";
-
-    /* ---------- 🔥 DYNAMIC ACTION BUTTONS ---------- */
-    if (Array.isArray(data.actions)) {
-      setDynamicActions(data.actions);
-    } else {
-      setDynamicActions([]);
-    }
-
-    /* ---------- 🧠 SMART MARKDOWN SPLIT ---------- */
-    const { intro, structured, outro } = splitReplyNaturally(botReply);
-
-    // 1️⃣ Intro (human reaction / acknowledgement)
-    if (intro) {
-      const introMsg = await saveMessage({
-        chat_id: chatId,
-        user_id: user.id,
-        role: "assistant",
-        content: intro,
+      // Call chat API
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            ...messages.slice(-20).map((m) => ({
+              role: m.role,
+              content: m.content,
+            })),
+            { role: "user", content: userMessage },
+          ],
+          persona: persona || undefined,
+          intent: intent || undefined,
+        }),
       });
-      setMessages((prev) => [...prev, introMsg]);
-    }
 
-    // 2️⃣ Structured content (diet plans, routines, markdown)
-    if (structured) {
-      const structuredMsg = await saveMessage({
-        chat_id: chatId,
-        user_id: user.id,
-        role: "assistant",
-        content: structured,
-      });
-      setMessages((prev) => [...prev, structuredMsg]);
-    }
+      const data = await response.json();
 
-    // 3️⃣ Outro (follow-up / soft closing)
-    if (outro) {
-      const outroMsg = await saveMessage({
-        chat_id: chatId,
-        user_id: user.id,
-        role: "assistant",
-        content: outro,
-      });
-      setMessages((prev) => [...prev, outroMsg]);
-    }
+      // Get bot reply and dynamic actions from API
+      const botReply =
+        data.reply || "hmm, kuch issue aa gaya. try again?";
 
+      if (Array.isArray(data.actions)) {
+        setDynamicActions(data.actions);
+      } else {
+        setDynamicActions([]);
+      }
 
-
-      // Save bot message
+      // Save bot message as single message (API formats it with newlines if needed)
       const botMsg = await saveMessage({
         chat_id: chatId,
         user_id: user.id,
