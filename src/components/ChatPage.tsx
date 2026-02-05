@@ -329,8 +329,8 @@ export default function ChatPage({
       // This allows natural multi-message responses like "hmm\nsamajh gayi\nlet's go"
       const messageParts = botReply
         .split("\n")
-        .map((part) => part.trim())
-        .filter((part) => part.length > 0); // Remove empty strings
+        .map((part: string) => part.trim())
+        .filter((part: string) => part.length > 0); // Remove empty strings
 
       // If no parts after filtering, save the original reply
       if (messageParts.length === 0) {
