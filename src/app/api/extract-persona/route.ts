@@ -7,10 +7,11 @@ const openai = new OpenAI({
 });
 
 // Initialize Supabase client for API routes
-// Uses anon key with RLS policies for security
+// Uses service role key since this is a backend API handling authenticated user data
+// Service role key has permission to bypass RLS policies
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ""
 );
 
 /**
