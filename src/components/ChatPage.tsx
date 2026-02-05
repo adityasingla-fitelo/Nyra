@@ -277,6 +277,24 @@ export default function ChatPage({
       });
       setMessages((prev) => [...prev, userMsg]);
 
+      // Extract and update persona information from user message (runs in background)
+      try {
+        await fetch("/api/extract-persona", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userMessage,
+            userId: user.id,
+          }),
+        });
+        // Reload persona to reflect any updates
+        const updatedPersona = await getPersona(user.id);
+        setPersona(updatedPersona);
+      } catch (error) {
+        console.error("Failed to extract persona:", error);
+        // Don't block chat flow if persona extraction fails
+      }
+
       // Call chat API
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -291,6 +309,7 @@ export default function ChatPage({
           ],
           persona: persona || undefined,
           intent: intent || undefined,
+          userId: user.id, // CRITICAL: Always send userId for security validation
         }),
       });
 
@@ -306,14 +325,34 @@ export default function ChatPage({
         setDynamicActions([]);
       }
 
-      // Save bot message as single message (API formats it with newlines if needed)
-      const botMsg = await saveMessage({
-        chat_id: chatId,
-        user_id: user.id,
-        role: "assistant",
-        content: botReply,
-      });
-      setMessages((prev) => [...prev, botMsg]);
+      // Split bot reply by \n and save each part as a separate message
+      // This allows natural multi-message responses like "hmm\nsamajh gayi\nlet's go"
+      const messageParts = botReply
+        .split("\n")
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0); // Remove empty strings
+
+      // If no parts after filtering, save the original reply
+      if (messageParts.length === 0) {
+        const botMsg = await saveMessage({
+          chat_id: chatId,
+          user_id: user.id,
+          role: "assistant",
+          content: botReply,
+        });
+        setMessages((prev) => [...prev, botMsg]);
+      } else {
+        // Save each part as a separate message
+        for (const part of messageParts) {
+          const botMsg = await saveMessage({
+            chat_id: chatId,
+            user_id: user.id,
+            role: "assistant",
+            content: part,
+          });
+          setMessages((prev) => [...prev, botMsg]);
+        }
+      }
     } catch (error) {
       console.error("Failed to send message:", error);
     } finally {

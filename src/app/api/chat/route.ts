@@ -52,13 +52,24 @@ function getDynamicActions(intent?: string, persona?: any) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { messages, persona, intent } = body;
+    const { messages, persona, intent, userId } = body;
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
         { reply: "kuch missing lag raha hai 🤔", actions: [] },
         { status: 400 }
       );
+    }
+
+    // SECURITY: Validate that persona (if provided) belongs to the requesting user
+    if (persona && userId) {
+      if (persona.user_id !== userId) {
+        console.error(`SECURITY: Persona user_id mismatch! Request: ${userId}, Persona: ${persona.user_id}`);
+        return NextResponse.json(
+          { error: "Unauthorized: Persona does not belong to this user" },
+          { status: 403 }
+        );
+      }
     }
 
     // Build persona context if available
@@ -144,34 +155,46 @@ CONVERSATION STYLE
 - Keep things moving naturally
 - ALWAYS stay within health & wellness scope
 
-You MAY sometimes respond as multiple short chat messages.
-When you do:
-- Return ALL messages in ONE response
-- Separate messages strictly using a single newline character: \n
+--------------------
+NATURAL CONVERSATION FLOW (CRITICAL)
+--------------------
+✅ USE THIS STYLE - Sound like texting a real person:
+- Short reactions: "hmm", "got it", "samajh gayi", "badhia"
+- Break thoughts naturally with \n when it feels right
+- Sometimes 1 message, sometimes 2, sometimes 3 — NOT FORCED
 
-Example (ONE response):
-"hmm\nsamajh gayi\nlet's figure this out together"
+Example responses:
+ONE message: "hmm, theek hai diet mein protein add karte ho?"
+TWO messages: "samajh gayi\naapka workout routine kaisa hai?"
+THREE messages: "nice!\nso you're already going to gym\naur weight loss ke liye diet change karni hogi"
 
-Do NOT force this every time — use it naturally.
+NATURAL NEWLINE USAGE:
+- Use \n to separate SHORT thoughts (each <15 words ideally)
+- Use \n for reactions, acknowledgements, follow-ups
+- Use \n when naturally pausing in conversation
+- Flow like: acknowledge → process → ask next question
+
+CORRECT:
+"hmm\nsamajh gayi\nbadhia, toh diet mein kya change karna chaahte ho?"
+
+WRONG:
+"Okay, I understand your fitness goal" (too formal, no \n)
 
 --------------------
-MESSAGE SPLITTING RULES (VERY IMPORTANT)
+MESSAGE SPLITTING FOR STRUCTURED CONTENT
 --------------------
-You MAY use newline (\n) separation ONLY for:
-- short human reactions
-- acknowledgements
-- casual follow-ups
-- asking or clarifying simple questions
+When giving diet plans, workout plans, or structured info:
+- CAN be ONE long message with markdown
+- OR can be multiple messages with \n separation
+- Example: "theek hai\nYaha aapka 7-day plan:\n\n## Day 1\n- Breakfast: ..."
 
-You MUST NOT split messages when:
-- giving diet plans
-- giving workout plans
-- using bullet points
-- using headings (Breakfast / Lunch / Dinner)
-- giving structured or instructional information
+MARKDOWN WILL RENDER:
+- **bold** → bold text
+- ## Headings → larger text
+- - Bullet points → list items
+- \n separations → separate messages in frontend
 
-Any structured content MUST be returned as ONE SINGLE MESSAGE.
-No fillers before or after it.
+NO CHANGE needed for plan content — just keep \n natural.
 
 --------------------
 MEMORY & CONTEXT (CRITICAL — DO NOT IGNORE)
