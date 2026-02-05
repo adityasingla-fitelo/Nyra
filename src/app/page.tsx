@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import ChatPage from "@/components/ChatPage";
+import { Sun, Moon } from "lucide-react";
 import {
   signInWithGoogle,
   getCurrentSession,
@@ -68,7 +69,7 @@ export default function Home() {
         <button
           type="button"
           onClick={() => setDarkMode(!darkMode)}
-          className="fixed top-4 right-4 z-[100] w-14 h-8 rounded-full bg-stone-200 dark:bg-gray-700 shrink-0 flex items-center transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-stone-400 dark:focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-black focus:ring-offset-stone-50"
+          className="fixed top-4 right-4 z-[100] w-14 h-8 rounded-full bg-stone-200 dark:bg-gray-700 shrink-0 flex items-center transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-stone-400 dark:focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-black"
           aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
         >
           <span
@@ -76,8 +77,8 @@ export default function Home() {
             style={{ transform: darkMode ? 'translateX(24px)' : 'translateX(0)' }}
           />
           <span className="relative flex w-full justify-between items-center px-2 pointer-events-none">
-            <span className="text-base">☀️</span>
-            <span className="text-base">🌙</span>
+            <Sun className="w-4 h-4 text-amber-500 dark:text-stone-500 transition-colors duration-300" />
+            <Moon className="w-4 h-4 text-stone-500 dark:text-amber-400 transition-colors duration-300" />
           </span>
         </button>
 
@@ -122,7 +123,7 @@ export default function Home() {
       <button
         type="button"
         onClick={() => setDarkMode(!darkMode)}
-        className="fixed top-4 right-4 z-[100] w-14 h-8 rounded-full bg-stone-200 dark:bg-gray-700 shrink-0 flex items-center transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-stone-400 dark:focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-black focus:ring-offset-stone-50"
+        className="fixed top-4 right-4 z-[100] w-14 h-8 rounded-full bg-stone-200 dark:bg-gray-700 shrink-0 flex items-center transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-stone-400 dark:focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-black"
         aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
       >
         <span
@@ -130,8 +131,8 @@ export default function Home() {
           style={{ transform: darkMode ? 'translateX(24px)' : 'translateX(0)' }}
         />
         <span className="relative flex w-full justify-between items-center px-2 pointer-events-none">
-          <span className="text-base">☀️</span>
-          <span className="text-base">🌙</span>
+          <Sun className="w-4 h-4 text-amber-500 dark:text-stone-500 transition-colors duration-300" />
+          <Moon className="w-4 h-4 text-stone-500 dark:text-amber-400 transition-colors duration-300" />
         </span>
       </button>
 

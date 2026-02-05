@@ -6,13 +6,8 @@ import remarkGfm from "remark-gfm";
 import {
   Send,
   Plus,
-  ChevronDown,
   ChevronRight,
   ChevronLeft,
-  History,
-  TrendingUp,
-  MonitorPlay,
-  User,
   Image as ImageIcon,
   FileText,
   MessageSquarePlus,
@@ -49,9 +44,6 @@ const quickActions = [
   { icon: "🔥", label: "Calorie Check", intent: "calorie_check" },
 ];
 
-const NYRA_TIERS = ["Nyra", "Nyra Plus", "Nyra Pro"] as const;
-type NyraTier = (typeof NYRA_TIERS)[number];
-
 export default function ChatPage({
   user,
   darkMode,
@@ -68,12 +60,6 @@ export default function ChatPage({
     { label: string; intent: string }[]
   >([]);
 
-  const [selectedNyraTier, setSelectedNyraTier] = useState<NyraTier>("Nyra");
-  const [isNyraDropdownOpen, setIsNyraDropdownOpen] = useState(false);
-  const [nyraDropdownPosition, setNyraDropdownPosition] = useState<{
-    bottom: number;
-    right: number;
-  } | null>(null);
   const [isPlusDropdownOpen, setIsPlusDropdownOpen] = useState(false);
   const [displayedTexts, setDisplayedTexts] = useState<Map<string, string>>(
     new Map()
@@ -83,8 +69,6 @@ export default function ChatPage({
   const [persona, setPersona] = useState<PersonaRow | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const nyraButtonRef = useRef<HTMLButtonElement>(null);
-  const nyraDropdownRef = useRef<HTMLDivElement>(null);
   const plusDropdownRef = useRef<HTMLDivElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -154,12 +138,6 @@ export default function ChatPage({
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
-      const inNyraButton = nyraButtonRef.current?.contains(target);
-      const inNyraDropdown = nyraDropdownRef.current?.contains(target);
-      if (!inNyraButton && !inNyraDropdown) {
-        setIsNyraDropdownOpen(false);
-        setNyraDropdownPosition(null);
-      }
       if (plusDropdownRef.current && !plusDropdownRef.current.contains(target))
         setIsPlusDropdownOpen(false);
     };
@@ -200,32 +178,7 @@ export default function ChatPage({
   };
 
   const closeDropdowns = () => {
-    setIsNyraDropdownOpen(false);
-    setNyraDropdownPosition(null);
     setIsPlusDropdownOpen(false);
-  };
-
-  const toggleNyraDropdown = () => {
-    if (isNyraDropdownOpen) {
-      setIsNyraDropdownOpen(false);
-      setNyraDropdownPosition(null);
-      return;
-    }
-    setIsPlusDropdownOpen(false);
-    const rect = nyraButtonRef.current?.getBoundingClientRect();
-    if (rect) {
-      setNyraDropdownPosition({
-        bottom: window.innerHeight - rect.top + 8,
-        right: window.innerWidth - rect.right,
-      });
-    }
-    setIsNyraDropdownOpen(true);
-  };
-
-  const selectNyraTier = (tier: NyraTier) => {
-    setSelectedNyraTier(tier);
-    setIsNyraDropdownOpen(false);
-    setNyraDropdownPosition(null);
   };
 
   const openPhotoPicker = () => {
@@ -409,12 +362,6 @@ export default function ChatPage({
     setIsMenuOpen(false);
   };
 
-  const sidebarItems = [
-    { icon: History, label: "History" },
-    { icon: TrendingUp, label: "Progress" },
-    { icon: MonitorPlay, label: "Content" },
-  ];
-
   return (
     <div className="min-h-screen bg-stone-50 dark:bg-black flex flex-col relative transition-colors">
       {/* Top bar */}
@@ -475,26 +422,7 @@ export default function ChatPage({
                 <MessageSquarePlus className="w-6 h-6" strokeWidth={1.5} />
                 <span className="text-xs">New chat</span>
               </button>
-              {sidebarItems.map(({ icon: Icon, label }) => (
-                <button
-                  key={label}
-                  className="flex flex-col items-center gap-2 text-stone-500 dark:text-gray-400 hover:text-stone-900 dark:hover:text-white transition-colors"
-                >
-                  <Icon className="w-6 h-6" strokeWidth={1.5} />
-                  <span className="text-xs">{label}</span>
-                </button>
-              ))}
             </nav>
-            <button
-              onClick={() => {
-                setIsMenuOpen(false);
-              }}
-              className="flex flex-col items-center gap-2 text-stone-500 dark:text-gray-400 hover:text-stone-900 dark:hover:text-white transition-colors"
-              aria-label="Profile"
-            >
-              <User className="w-6 h-6" strokeWidth={1.5} />
-              <span className="text-xs">Profile</span>
-            </button>
             <button
               onClick={() => {
                 setIsMenuOpen(false);
@@ -508,33 +436,6 @@ export default function ChatPage({
             </button>
           </aside>
         </>
-      )}
-
-      {/* Nyra tier dropdown */}
-      {isNyraDropdownOpen && nyraDropdownPosition && (
-        <div
-          ref={nyraDropdownRef}
-          className="fixed w-36 py-1 bg-white dark:bg-[#1a1a1a] rounded-lg shadow-xl border border-stone-200 dark:border-gray-800 z-50"
-          style={{
-            bottom: nyraDropdownPosition.bottom,
-            right: nyraDropdownPosition.right,
-          }}
-        >
-          {NYRA_TIERS.map((tier) => (
-            <button
-              key={tier}
-              type="button"
-              onClick={() => selectNyraTier(tier)}
-              className={`w-full px-4 py-2.5 text-left text-sm rounded mx-1 ${
-                selectedNyraTier === tier
-                  ? "bg-stone-100 dark:bg-[#252525] text-stone-700 dark:text-[#FF6B4A]"
-                  : "text-stone-800 dark:text-white hover:bg-stone-50 dark:hover:bg-[#252525]"
-              }`}
-            >
-              {tier}
-            </button>
-          ))}
-        </div>
       )}
 
       {/* Hidden file inputs */}
@@ -586,7 +487,6 @@ export default function ChatPage({
                     type="button"
                     onClick={() => {
                       setIsPlusDropdownOpen((o) => !o);
-                      setIsNyraDropdownOpen(false);
                     }}
                     className="p-1 rounded-full hover:bg-stone-100 dark:hover:bg-[#252525] text-stone-500 dark:text-gray-500 hover:text-stone-800 dark:hover:text-white transition-colors"
                     aria-label="Add attachments"
@@ -615,15 +515,6 @@ export default function ChatPage({
                   )}
                 </div>
                 <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 sm:gap-3">
-                  <button
-                    ref={nyraButtonRef}
-                    type="button"
-                    onClick={toggleNyraDropdown}
-                    className="flex items-center gap-1.5 sm:gap-2 text-stone-800 dark:text-white text-xs sm:text-sm hover:opacity-90"
-                  >
-                    {selectedNyraTier}
-                    <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  </button>
                   <button
                     onClick={() => sendMessage()}
                     disabled={loading}
@@ -734,7 +625,6 @@ export default function ChatPage({
                   type="button"
                   onClick={() => {
                     setIsPlusDropdownOpen((o) => !o);
-                    setIsNyraDropdownOpen(false);
                   }}
                   className="p-1 rounded-full hover:bg-stone-100 dark:hover:bg-[#252525] text-stone-500 dark:text-gray-500 hover:text-stone-800 dark:hover:text-white transition-colors"
                   aria-label="Add attachments"
@@ -763,15 +653,6 @@ export default function ChatPage({
                 )}
               </div>
               <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 sm:gap-3">
-                <button
-                  ref={nyraButtonRef}
-                  type="button"
-                  onClick={toggleNyraDropdown}
-                  className="flex items-center gap-1.5 sm:gap-2 text-stone-800 dark:text-white text-xs sm:text-sm hover:opacity-90"
-                >
-                  {selectedNyraTier}
-                  <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                </button>
                 <button
                   onClick={() => sendMessage()}
                   disabled={loading}
