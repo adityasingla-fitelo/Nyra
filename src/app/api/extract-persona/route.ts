@@ -118,6 +118,8 @@ Return ONLY valid JSON with extracted fields, no explanations:
     const responseText =
       completion.choices[0]?.message?.content || "{}";
 
+    console.log("LLM extraction response:", responseText);
+
     // Parse the JSON response
     let extractedFields: Record<string, any> = {};
     try {
@@ -125,9 +127,10 @@ Return ONLY valid JSON with extracted fields, no explanations:
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         extractedFields = JSON.parse(jsonMatch[0]);
+        console.log("Parsed extracted fields:", extractedFields);
       }
     } catch (parseError) {
-      console.error("JSON parse error:", parseError);
+      console.error("JSON parse error:", parseError, "Response was:", responseText);
       // If parsing fails, return empty object
       return NextResponse.json({
         success: true,
@@ -144,8 +147,11 @@ Return ONLY valid JSON with extracted fields, no explanations:
       }
     }
 
+    console.log("Cleaned fields to update:", cleanedFields);
+
     // If no fields were extracted, return early
     if (Object.keys(cleanedFields).length === 0) {
+      console.log("No persona info found in message:", userMessage);
       return NextResponse.json({
         success: true,
         extractedFields: {},
@@ -156,11 +162,16 @@ Return ONLY valid JSON with extracted fields, no explanations:
     // Update persona in database - CRITICAL: Always verify user_id
     cleanedFields.user_id = userId;
 
+    console.log("Attempting to upsert persona for user:", userId);
+    console.log("Fields to upsert:", cleanedFields);
+
     const { data: existingPersona, error: checkError } = await supabase
       .from("personas")
       .select("id, user_id")
       .eq("user_id", userId) // CRITICAL: Filter by user_id
       .maybeSingle();
+
+    console.log("Existing persona check:", { existingPersona, checkError });
 
     if (checkError) {
       console.error("Persona check error:", checkError);
@@ -169,6 +180,8 @@ Return ONLY valid JSON with extracted fields, no explanations:
 
     let upsertResult;
     if (existingPersona) {
+      console.log("Updating existing persona:", existingPersona.id);
+      
       // Verify ownership before updating
       if (existingPersona.user_id !== userId) {
         console.error(`SECURITY: Attempted update of persona belonging to different user!`);
@@ -186,18 +199,24 @@ Return ONLY valid JSON with extracted fields, no explanations:
         .select()
         .single();
 
+      console.log("Update result:", { success: !error, data, error });
+
       if (error) {
         console.error("Persona update error:", error);
         throw error;
       }
       upsertResult = data;
     } else {
+      console.log("Creating new persona for user:", userId);
+      
       // Create new persona - CRITICAL: Set correct user_id
       const { data, error } = await supabase
         .from("personas")
         .insert(cleanedFields)
         .select()
         .single();
+
+      console.log("Insert result:", { success: !error, data, error });
 
       if (error) {
         console.error("Persona insert error:", error);

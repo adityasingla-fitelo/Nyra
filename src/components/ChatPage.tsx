@@ -279,7 +279,7 @@ export default function ChatPage({
 
       // Extract and update persona information from user message (runs in background)
       try {
-        await fetch("/api/extract-persona", {
+        const extractResponse = await fetch("/api/extract-persona", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -287,6 +287,19 @@ export default function ChatPage({
             userId: user.id,
           }),
         });
+        
+        const extractData = await extractResponse.json();
+        
+        if (!extractResponse.ok) {
+          console.error("Extract persona failed:", extractData);
+        } else {
+          console.log("Persona extraction result:", {
+            success: extractData.success,
+            extractedFields: extractData.extractedFields,
+            message: extractData.message,
+          });
+        }
+        
         // Reload persona to reflect any updates
         const updatedPersona = await getPersona(user.id);
         setPersona(updatedPersona);
@@ -669,18 +682,14 @@ export default function ChatPage({
                       }`}
                     >
                       {msg.role === "assistant" ? (
-                        isTyping ? (
-                          <div className="whitespace-pre-wrap break-words">
+                        <div className="nyra-markdown break-words">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
                             {displayedText}
+                          </ReactMarkdown>
+                          {isTyping && (
                             <span className="inline-block w-0.5 h-4 bg-stone-600 dark:bg-gray-400 ml-1 animate-pulse" />
-                          </div>
-                        ) : (
-                          <div className="nyra-markdown break-words">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                              {displayedText}
-                            </ReactMarkdown>
-                          </div>
-                        )
+                          )}
+                        </div>
                       ) : (
                         <div className="whitespace-pre-wrap break-words">
                           {displayedText}
