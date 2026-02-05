@@ -6,10 +6,11 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Initialize Supabase with service role (for backend operations)
+// Initialize Supabase client for API routes
+// Uses anon key with RLS policies for security
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ""
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 );
 
 /**
