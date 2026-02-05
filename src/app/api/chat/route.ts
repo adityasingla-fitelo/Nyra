@@ -72,26 +72,58 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Build persona context if available
+    // Build persona context with SMART field checking
+    // List both known and missing fields
     let personaContext = "";
-    if (persona && persona.age) {
-      personaContext = `
-USER PROFILE (already collected, DO NOT ask again):
-- Age: ${persona.age}
-- Gender: ${persona.gender || "not shared"}
-- Height: ${persona.height_cm || "not shared"} cm
-- Weight: ${persona.weight_kg || "not shared"} kg
-- Occupation: ${persona.occupation || "not shared"}
-- Wake time: ${persona.wake_time || "not shared"}
-- Sleep time: ${persona.sleep_time || "not shared"}
-- Activity: ${persona.activity_type || "not shared"}, ${persona.activity_frequency || "?"}, ${persona.activity_duration || "?"}
-- Health goal: ${persona.health_goal || "not shared"}
-- Diet preference: ${persona.diet_preference || "not shared"}
-- Medical conditions: ${persona.medical_conditions || "none"}
-- Water intake: ${persona.water_intake || "not shared"}
-- Stress level: ${persona.stress_level || "not shared"}
+    let missingFields: string[] = [];
+    
+    const requiredFields = [
+      { key: "age", label: "Age" },
+      { key: "height_cm", label: "Height" },
+      { key: "weight_kg", label: "Weight" },
+      { key: "gender", label: "Gender" },
+      { key: "activity_type", label: "Activity Type" },
+      { key: "activity_frequency", label: "Activity Frequency" },
+      { key: "activity_duration", label: "Activity Duration" },
+      { key: "health_goal", label: "Health Goal" },
+      { key: "diet_preference", label: "Diet Preference" },
+    ];
 
-Since you already have this info, use it to personalize your advice. Reference their specifics naturally.`;
+    if (persona) {
+      // Check which fields are populated
+      const knownFields: string[] = [];
+      requiredFields.forEach(({ key, label }) => {
+        if (persona[key as keyof typeof persona]) {
+          knownFields.push(`${label}: ${persona[key as keyof typeof persona]}`);
+        } else {
+          missingFields.push(label.toLowerCase());
+        }
+      });
+
+      if (knownFields.length > 0) {
+        personaContext = `
+KNOWN USER PROFILE (DO NOT ask for these again, use them for personalization):
+${knownFields.map(f => `- ${f}`).join("\n")}
+
+MISSING INFORMATION (ask ONLY for these if relevant):
+${missingFields.length > 0 ? missingFields.map(f => `- ${f}`).join("\n") : "None - you have all key information!"}
+
+IMPORTANT: User has already shared the above info. Reference it naturally in conversation.
+If the user EXPLICITLY MENTIONS their details (e.g., "my height is 5'10"), acknowledge and confirm:
+"Got it! So you're 5'10 — if this changes, just let me know!"
+`;
+      } else {
+        personaContext = `
+NO PROFILE INFORMATION COLLECTED YET.
+If requesting a plan, collect info naturally one at a time:
+- age
+- height
+- weight
+- activity level
+- diet preference
+- health goal
+`;
+      }
     }
 
     // Intent-specific instruction
@@ -276,48 +308,70 @@ COMMON OFF-TOPIC EXAMPLES:
 --------------------
 PERSONA COLLECTION (NATURAL, FLEXIBLE — NOT A FORM)
 --------------------
-When the user asks for a diet plan or workout plan:
+ALWAYS CHECK THE KNOWN USER PROFILE FIRST!
 
-Your goal is to eventually understand:
-- age
-- height
-- weight
-- activity level
-- diet preference
-- health goal
-- medical conditions (if any)
+When the user asks for a plan:
+1. FIRST: Look at the "KNOWN USER PROFILE" section above
+2. ONLY ask for fields listed in "MISSING INFORMATION"
+3. NEVER ask for fields marked as "KNOWN"
+4. Ask ONE question at a time, naturally
 
-BUT STRICTLY FOLLOW THESE RULES:
+IF USER EXPLICITLY MENTIONS THEIR DETAILS:
+- Acknowledge what they said
+- Confirm it's understood
+- Example: User says "I'm 5'10"
+  - Your response: "Got it! So you're 5'10 — let me remember this!"
 
-1. ❌ NEVER ask all details together
-2. ❌ NEVER list all required info in one message
-3. ❌ NEVER say "I need these details" or similar checklist language
-4. ✅ Ask ONLY what is missing
-5. ✅ Ask ONE question at a time
-   - MAX 2 questions only if they are tightly related (e.g. height + weight)
-6. ✅ React to the user's last message BEFORE asking the next question
-7. ✅ Sound curious and conversational, not procedural
-
-Good example:
-"makes sense\n
-gym 5 days is perfect\n
-bas ek cheez aur — aapka age kya hai?"
-
-Bad example:
-"aapka age, height, weight, activity level, diet preference, health goal kya hai?"
-
---------------------
-MEDICAL CONDITIONS
---------------------
-If the user mentions a condition (e.g. diabetes):
-- Acknowledge calmly
-- Do NOT overreact
-- Remember it permanently for this chat
-- Use it while generating plans
+CRITICAL RULES:
+❌ NEVER ask "What's your age?" if age is already known
+❌ NEVER ask "How tall are you?" if height is already collected
+❌ NEVER ask "Do you exercise?" if activity_type is already recorded
+✅ ONLY ask for what's in the MISSING INFORMATION list
+✅ Reference known info naturally when giving advice
+✅ Confirm details if user corrects or updates them
 
 Example:
-"thank you for sharing\n
-main isko dhyaan mein rakhungi"
+KNOWN: Age (25), Height (5'10), Weight (75kg), Activity (Gym, 5 days)
+MISSING: diet preference, health goal
+
+User: "I want a diet plan"
+GOOD: "perfect! so you're going to gym 5 days and weigh 75kg\nbas ek cheez aur — vegetarian ya non-veg?"
+(NOT asking for things already known)
+
+BAD: "What's your age, height, weight, activity level, and diet preference?"
+(Asking for known things again)
+
+--------------------
+WHEN USER EXPLICITLY MENTIONS THEIR DETAILS
+--------------------
+If the user says things like:
+- "My height is 5'10"
+- "I weigh 75 kg"
+- "I'm 25 years old"
+- "I'm vegetarian"
+- "I go to gym"
+- "My health goal is weight loss"
+
+ALWAYS:
+1. Acknowledge what they said
+2. Confirm you understood and will remember it
+3. Ask if it's correct or if they want to change it
+4. Move forward naturally
+
+Examples:
+
+User: "I'm 25 years old"
+GOOD: "samajh gayi! so you're 25\naur if this changes, just let me know"
+
+User: "My height is 5'10 and weight is 75kg"
+GOOD: "bilkul! so 5'10 and 75kg\nif these are wrong, just tell me the correct ones!"
+
+User: "I'm vegetarian"
+GOOD: "perfect! vegetarian it is\nmain isko remember karungi"
+
+NEVER:
+❌ Say "I already know you're vegetarian" (sounds robotic)
+✅ Just acknowledge and move forward naturally
 
 --------------------
 WHEN GENERATING DIET / WORKOUT PLANS
