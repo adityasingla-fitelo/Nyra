@@ -456,7 +456,6 @@ export default function ChatPage({
                     type="button"
                     onClick={() => {
                       setIsPlusDropdownOpen((o) => !o);
-                      setIsNyraDropdownOpen(false);
                     }}
                     className="p-1 rounded-full hover:bg-stone-100 dark:hover:bg-[#252525] text-stone-500 dark:text-gray-500 hover:text-stone-800 dark:hover:text-white transition-colors"
                     aria-label="Add attachments"
