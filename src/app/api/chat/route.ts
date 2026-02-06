@@ -5,6 +5,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+
 /**
  * Decide which buttons to show.
  * Keep this deterministic (NOT LLM-generated).
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
     // List both known and missing fields
     let personaContext = "";
     let missingFields: string[] = [];
-    
+
     const requiredFields = [
       { key: "age", label: "Age" },
       { key: "height_cm", label: "Height" },
@@ -440,39 +441,76 @@ ${personaContext}
 
 ${intentInstruction}`;
 
-    // Build final messages with system prompt
+    // Add format instruction to system prompt
+    const jsonInstruction = `
+--------------------
+RESPONSE FORMAT (CRITICAL)
+--------------------
+You must respond in valid JSON format ONLY.
+Schema:
+{
+  "reply": "string (your actual conversational response using all the personality rules above)",
+  "followUpQuestions": ["string", "string", "string"] (3-4 short, relevant follow-up questions the user might want to ask next)
+}
+
+Example:
+{
+  "reply": "samajh gayi! diet plan ready hai via...",
+  "followUpQuestions": ["High protein options?", "Veg alternatives?", "Exercise suggestion?"]
+}
+`;
+
     const finalMessages = [
-      { role: "system" as const, content: systemPrompt },
-      ...messages.slice(-25), // Keep last 25 messages for context
+      { role: "system" as const, content: systemPrompt + jsonInstruction },
+      ...messages.slice(-2), // Keep last 25 messages for context
     ];
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: finalMessages,
       temperature: 0.8,
-      max_tokens: intent === "diet_plan" ? 2500 : 400,
+      max_tokens: intent === "diet_plan" ? 2500 : 1800, // Increased limit for JSON overhead
       presence_penalty: 0.4,
       frequency_penalty: 0.3,
+      response_format: { type: "json_object" }, // FORCE JSON
     });
 
-    const reply =
-      completion.choices[0]?.message?.content ||
-      "hmm, kuch issue aa gaya. try again?";
+    const content = completion.choices[0]?.message?.content;
+    let reply = "hmm, kuch issue aa gaya. try again?";
+    let followUpQuestions: string[] = [];
+
+    try {
+      if (content) {
+        const parsed = JSON.parse(content);
+        reply = parsed.reply || reply;
+        followUpQuestions = parsed.followUpQuestions || [];
+      }
+    } catch (e) {
+      console.error("Failed to parse JSON response:", e);
+      reply = content || reply; // Fallback to raw content if parse fails
+    }
 
     // ─────────────────────────────
-    // Dynamic buttons
+    // Dynamic buttons (Legacy + AI Combined?)
     // ─────────────────────────────
-    const actions = getDynamicActions(intent, persona);
+    // The user wants AI follow-ups. We can merge them or just use AI ones.
+    // Let's use AI follow-ups as the primary "suggestions".
+    const staticActions = getDynamicActions(intent, persona);
+
+    // Convert static actions to simple strings if we want to merge, or keep separate?
+    // Client expects specific legacy format for actions?
+    // Let's pass followUpQuestions separately.
 
     return NextResponse.json({
       reply,
-      actions,
+      actions: staticActions, // Keep legacy actions for now if UI uses them
+      followUpQuestions,
     });
   } catch (error: any) {
     console.error("OpenAI Error:", error);
 
     return NextResponse.json({
-      reply: "kuch technical issue aa gaya 😓 ek baar phir try karo",
+      reply: `Error: ${error.message || "Unknown error"}`,
       actions: [],
     });
   }
