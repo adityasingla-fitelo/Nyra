@@ -59,6 +59,7 @@ export default function ChatPage({
   const [dynamicActions, setDynamicActions] = useState<
     { label: string; intent: string }[]
   >([]);
+  const [followUps, setFollowUps] = useState<string[]>([]);
 
   const [isPlusDropdownOpen, setIsPlusDropdownOpen] = useState(false);
   const [displayedTexts, setDisplayedTexts] = useState<Map<string, string>>(
@@ -93,45 +94,77 @@ export default function ChatPage({
   }, [messages, displayedTexts]);
 
 
-  // Typewriter effect for bot messages
+  // Typewriter effect logic:
+  // 1. Cleanup on unmount ONLY
   useEffect(() => {
-    messages.forEach((msg) => {
-      if (msg.role === "assistant" && !displayedTexts.has(msg.id)) {
-        const fullText = msg.content;
-        const words = fullText.split(" ");
-        let currentIndex = 0;
-
-        setDisplayedTexts((prev) => {
-          const newMap = new Map(prev);
-          newMap.set(msg.id, "");
-          return newMap;
-        });
-
-        const interval = setInterval(() => {
-          if (currentIndex < words.length) {
-            setDisplayedTexts((prev) => {
-              const newMap = new Map(prev);
-              const currentText = words.slice(0, currentIndex + 1).join(" ");
-              newMap.set(msg.id, currentText);
-              return newMap;
-            });
-            currentIndex++;
-          } else {
-            clearInterval(interval);
-            typewriterIntervalsRef.current.delete(msg.id);
-          }
-        }, 50);
-
-        typewriterIntervalsRef.current.set(msg.id, interval);
-      }
-    });
-
     return () => {
       typewriterIntervalsRef.current.forEach((interval) =>
         clearInterval(interval)
       );
       typewriterIntervalsRef.current.clear();
     };
+  }, []);
+
+  // 2. Start typing for new messages
+  useEffect(() => {
+    messages.forEach((msg) => {
+      // Only start if:
+      // a) It's an assistant message
+      // b) It's NOT fully displayed yet
+      // c) We aren't ALREADY typing it (check map)
+      const isAssistant = msg.role === "assistant";
+      const hasFullText = displayedTexts.get(msg.id) === msg.content;
+      const isAlreadyTyping = typewriterIntervalsRef.current.has(msg.id);
+
+      if (isAssistant && !hasFullText && !isAlreadyTyping) {
+        // Initialize if not present
+        if (!displayedTexts.has(msg.id)) {
+          setDisplayedTexts((prev) => {
+            const newMap = new Map(prev);
+            newMap.set(msg.id, "");
+            return newMap;
+          });
+        }
+
+        const fullText = msg.content;
+        const words = fullText.split(" ");
+        let currentIndex = 0;
+
+        // If we are resuming (e.g. strict mode double invoke), try to catch up?
+        // For simplicity, start from 0 works because state is "" above. 
+        // If state was partial, we would need to calc currentIndex.
+        // Let's safe-guard: if we have partial text, find index.
+        const currentText = displayedTexts.get(msg.id) || "";
+        if (currentText) {
+          const currentWords = currentText.split(" ");
+          currentIndex = currentWords.length;
+        }
+
+        const interval = setInterval(() => {
+          if (currentIndex < words.length) {
+            setDisplayedTexts((prev) => {
+              const newMap = new Map(prev);
+              const nextText = words.slice(0, currentIndex + 1).join(" ");
+              newMap.set(msg.id, nextText);
+              return newMap;
+            });
+            currentIndex++;
+          } else {
+            clearInterval(interval);
+            typewriterIntervalsRef.current.delete(msg.id);
+
+            // Ensure exact match at end
+            setDisplayedTexts((prev) => {
+              const newMap = new Map(prev);
+              newMap.set(msg.id, fullText);
+              return newMap;
+            });
+          }
+        }, 30); // Faster typing (30ms)
+
+        typewriterIntervalsRef.current.set(msg.id, interval);
+      }
+    });
   }, [messages]);
 
   // Close dropdowns when clicking outside
@@ -207,6 +240,8 @@ export default function ChatPage({
     const userMessage = text || inputMessage.trim();
     if (!userMessage) return;
 
+    // Clear follow-ups and dropdowns
+    setFollowUps([]);
     closeDropdowns();
     setInputMessage("");
     setLoading(true);
@@ -240,9 +275,9 @@ export default function ChatPage({
             userId: user.id,
           }),
         });
-        
+
         const extractData = await extractResponse.json();
-        
+
         if (!extractResponse.ok) {
           console.error("Extract persona failed:", extractData);
         } else {
@@ -252,7 +287,7 @@ export default function ChatPage({
             message: extractData.message,
           });
         }
-        
+
         // Reload persona to reflect any updates
         const updatedPersona = await getPersona(user.id);
         setPersona(updatedPersona);
@@ -291,20 +326,26 @@ export default function ChatPage({
         setDynamicActions([]);
       }
 
+      if (Array.isArray(data.followUpQuestions)) {
+        setFollowUps(data.followUpQuestions);
+      } else {
+        setFollowUps([]);
+      }
+
       // Split bot reply by \n ONLY for casual responses
       // Structured content (headings, bullet points) should stay as ONE message
-      
+
       // Check if this is structured content (diet plans, workout plans, etc.)
-      const isStructuredContent = botReply.includes("##") || 
-                                  botReply.includes("###") ||
-                                  (botReply.includes("- ") && botReply.includes(":")) ||
-                                  botReply.includes("**Day") ||
-                                  botReply.includes("Breakfast") ||
-                                  botReply.includes("Lunch") ||
-                                  botReply.includes("Dinner");
+      const isStructuredContent = botReply.includes("##") ||
+        botReply.includes("###") ||
+        (botReply.includes("- ") && botReply.includes(":")) ||
+        botReply.includes("**Day") ||
+        botReply.includes("Breakfast") ||
+        botReply.includes("Lunch") ||
+        botReply.includes("Dinner");
 
       let messageParts: string[] = [];
-      
+
       if (isStructuredContent) {
         // For structured content: save as ONE message, no splitting
         messageParts = [botReply];
@@ -559,18 +600,16 @@ export default function ChatPage({
                 return (
                   <div
                     key={`${msg.id}-${index}`}
-                    className={`flex ${
-                      msg.role === "assistant"
-                        ? "justify-start"
-                        : "justify-end"
-                    }`}
+                    className={`flex ${msg.role === "assistant"
+                      ? "justify-start"
+                      : "justify-end"
+                      }`}
                   >
                     <div
-                      className={`max-w-[90%] sm:max-w-[85%] md:max-w-[70%] px-4 py-3 rounded-2xl shadow-sm border ${
-                        msg.role === "assistant"
-                          ? "bg-white dark:bg-[#1a1a1a] text-stone-800 dark:text-white border-stone-200 dark:border-gray-700"
-                          : "bg-stone-200 dark:bg-[#FF6B4A] text-stone-900 dark:text-white border-stone-300 dark:border-[#ff5a39]"
-                      }`}
+                      className={`max-w-[90%] sm:max-w-[85%] md:max-w-[70%] px-4 py-3 rounded-2xl shadow-sm border ${msg.role === "assistant"
+                        ? "bg-white dark:bg-[#1a1a1a] text-stone-800 dark:text-white border-stone-200 dark:border-gray-700"
+                        : "bg-stone-200 dark:bg-[#FF6B4A] text-stone-900 dark:text-white border-stone-300 dark:border-[#ff5a39]"
+                        }`}
                     >
                       {msg.role === "assistant" ? (
                         <div className="nyra-markdown break-words">
@@ -607,6 +646,21 @@ export default function ChatPage({
               )}
               <div ref={messagesEndRef} />
             </div>
+
+            {/* Follow-up Suggestions */}
+            {followUps.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-2 px-1 mb-2 no-scrollbar scroll-smooth">
+                {followUps.map((text, i) => (
+                  <button
+                    key={i}
+                    onClick={() => sendMessage(text)}
+                    className="flex-shrink-0 px-3 py-1.5 bg-stone-100 dark:bg-[#1a1a1a] text-stone-600 dark:text-stone-300 text-sm rounded-full border border-stone-200 dark:border-gray-800 hover:bg-stone-200 dark:hover:bg-[#252525] hover:text-stone-900 dark:hover:text-white transition-colors"
+                  >
+                    {text}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div className="relative">
               <input

@@ -113,7 +113,7 @@ Return ONLY valid JSON with extracted fields, no explanations:
         },
       ],
       temperature: 0.3, // Lower temperature for consistent extraction
-      max_tokens: 300,
+      max_tokens: 600,
     });
 
     const responseText =
@@ -182,7 +182,7 @@ Return ONLY valid JSON with extracted fields, no explanations:
     let upsertResult;
     if (existingPersona) {
       console.log("Updating existing persona:", existingPersona.id);
-      
+
       // Verify ownership before updating
       if (existingPersona.user_id !== userId) {
         console.error(`SECURITY: Attempted update of persona belonging to different user!`);
@@ -209,7 +209,7 @@ Return ONLY valid JSON with extracted fields, no explanations:
       upsertResult = data;
     } else {
       console.log("Creating new persona for user:", userId);
-      
+
       // Create new persona - CRITICAL: Set correct user_id
       const { data, error } = await supabase
         .from("personas")
